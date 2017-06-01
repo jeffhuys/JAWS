@@ -1,17 +1,29 @@
 #!/bin/bash
 
-main() {
-	case "$1" in
-		get-env-var)
-			get-env-var "$@"
-			;;
-	esac
-}
-
 get-env-var() {
-	echo "Getting env var"
-	echo "$2"
+	if [ -z "$2" ]; then
+		echo "Usage"
+	else
+		# Task-def is supplied
+		echo "lal"
+	fi
+}
+
+get-revision() {
+	if [ -z "$2" ]; then
+		echo "Usage"
+	else
+		# Task-def is supplied
+		# Generate taskdef string (if revision supplied, add it with ':')
+		if [ -z "$3" ]; then
+			td="$2"
+		else
+			td="$2:$3"
+		fi
+
+		aws ecs describe-task-definition --region eu-west-1 --task-definition $td
+	fi
 }
 
 
-main "$@"
+eval $1 $@
