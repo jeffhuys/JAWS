@@ -1,29 +1,117 @@
-#!/bin/bash
+#!/usr/bin/env node
+const commandLineArgs = require ('command-line-args')
+const getUsage = require ('command-line-usage')
+const chalk = require ('chalk')
+const AWS = require('aws-sdk')
+const ecs = new AWS.ECS()
 
-get-env-var() {
-	if [ -z "$2" ]; then
-		echo "Usage"
-	else
-		# Task-def is supplied
-		echo "lal"
-	fi
+// Create definitions for arguments
+const optionDefinitions = [
+    { name: 'help', alias: 'h', type: Boolean },
+    { name: 'taskdef', alias: 't', type: String },
+    { name: 'list', alias: 'l', type: Boolean },
+    { name: 'getEnvVars', alias: 'e', type: Boolean},
+    { name: 'var', alias: 'v', type: String},
+    { name: 'region', alias: 'r', type: String},
+]
+
+// Create definitions for help
+const usageSections = [
+  {
+    header: `JAWS: Jeff\'s AWS cli`,
+    content: `Try it!`
+  },
+  {
+    header: 'Options',
+    optionList: optionDefinitions
+  }
+]
+
+// Parse arguments
+const args = commandLineArgs (optionDefinitions)
+const usageText = getUsage (usageSections)
+
+// Show help if needed
+if (isEmptyObject (args) || args.help) {
+  
+  console.log (usageText)
+  process.exit (0)
+
 }
 
-get-revision() {
-	if [ -z "$2" ]; then
-		echo "Usage"
-	else
-		# Task-def is supplied
-		# Generate taskdef string (if revision supplied, add it with ':')
-		if [ -z "$3" ]; then
-			td="$2"
-		else
-			td="$2:$3"
-		fi
+if (args.region) {
+  console.log(args.region)
+  AWS.config.update ( { region: args.region } )
+}
 
-		aws ecs describe-task-definition --region eu-west-1 --task-definition $td
-	fi
+// Task definitions
+if (args.taskdef) {
+
+  const split  = args.taskdef.split (':')
+  const tdName = split[0]
+  const tdRev  = split[1]
+  // Pre-cache
+  const taskdef = new Promise(
+    (res, rej) => ecs.describeTaskDefinition ( { taskDefinition: args.taskdef }, 
+      (err, data) => err ? rej (err) : res (data) ) )
+    .catch( (err) => errorLog(err) )
+
+  // - List all taskdef revisions
+  if (args.list) {
+    debugLog ('Getting revision list of', args.taskdef)
+    return
+  }
+
+  // - Get all environment variables..
+  if (args.getEnvVars) {
+
+    // -- ..of a certain revision?
+    if (tdRev) {
+
+      debugLog (`getting env vars for ${tdName}, revision ${tdRev}`)
+
+    // -- ..or of the latest one?
+    } else {
+
+      debugLog ('getting env vars for latest revision of', args.taskdef)
+
+    }
+
+  }
+
+  // - Get a single variable
+  if (args.var) {
+
+    // -- ..of a certain revision?
+    if (tdRev) {
+
+      debugLog (`getting env var ${ chalk.bold.cyan (args.var) } from ${ chalk.bold.cyan (tdName) }, revision ${ chalk.bold.cyan (tdRev) }`)
+
+    // -- ..or of the latest one?
+    } else {
+
+      debugLog (`getting env var ${ chalk.bold.cyan (args.var) } from ${ chalk.bold.cyan (tdName) }, ${ chalk.bold.cyan ('latest') } revision`)
+
+    }
+
+
+  }
+
 }
 
 
-eval $1 $@
+
+
+function isEmptyObject (obj) {
+  return !Object.keys(obj).length;
+}
+
+function errorLog (err) {
+  console.log ('\n')
+  console.log ( chalk.red.bold('ERROR:'), err.code )
+  console.log ( err.message )
+}
+
+function debugLog() {
+  if (!args.quiet) console.log.apply(console.log, arguments)
+}
