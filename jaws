@@ -1,0 +1,17 @@
+#!/bin/bash
+
+main() {
+	case "$1" in
+		get-env-var)
+			get-env-var "$@"
+			;;
+	esac
+}
+
+get-env-var() {
+	echo "Getting env var"
+	echo "$2"
+}
+
+
+main "$@"
