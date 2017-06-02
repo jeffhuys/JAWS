@@ -127,11 +127,13 @@ async function taskdef (args) {
 
               env.value = args.set
 
-            else
+            else {
 
-              await yesnoP (`${ chalk.bold.yellow ('WARNING:') } you are now changing an environment variable in task definition ${ chalk.bold( tdName ) }:\n${ chalk.bold.cyan (env.name) }: ${ chalk.bold.red (env.value) } -> ${ chalk.bold.green (args.set) }\nAre you sure you want to continue?`)
-                      .then( () => env.value = args.set )
-                      .catch( () => process.exit(1))
+              if (await yesnoP (`${ chalk.bold.yellow ('WARNING:') } you are now changing an environment variable in task definition ${ chalk.bold( tdName ) }:\n${ chalk.bold.cyan (env.name) }: ${ chalk.bold.red (env.value) } -> ${ chalk.bold.green (args.set) }\nAre you sure you want to continue?`).catch( () => process.exit(1) ))
+
+                return env.value = args.set
+
+            }
 
           }
 
@@ -204,7 +206,7 @@ function describeTaskDefinition( args ) {
 
 function yesnoP (question) {
   return new Promise (function (resolve, reject) {
-    yesno.ask(question, false, yes => yes ? resolve() : reject())
+    yesno.ask(question, false, yes => yes ? resolve(yes) : reject())
   })
 }
 
