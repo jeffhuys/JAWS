@@ -78,6 +78,12 @@ command-line-usage@^4.0.0:
     table-layout "^0.4.0"
     typical "^2.6.0"
 
+commander-plus@^0.0.6:
+  version "0.0.6"
+  resolved "https://registry.yarnpkg.com/commander-plus/-/commander-plus-0.0.6.tgz#280e9d3e30a392d8cda0f3d2721b856c832f602b"
+  dependencies:
+    keypress "0.1.x"
+
 crypto-browserify@1.0.9:
   version "1.0.9"
   resolved "https://registry.yarnpkg.com/crypto-browserify/-/crypto-browserify-1.0.9.tgz#cc5449685dfb85eb11c9828acc7cb87ab5bbfcc0"
@@ -116,6 +122,10 @@ ieee754@^1.1.4:
 jmespath@0.15.0:
   version "0.15.0"
   resolved "https://registry.yarnpkg.com/jmespath/-/jmespath-0.15.0.tgz#a3f222a9aae9f966f5d27c796510e28091764217"
+
+keypress@0.1.x:
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/keypress/-/keypress-0.1.0.tgz#4a3188d4291b66b4f65edb99f806aa9ae293592a"
 
 lodash.find@^4.6.0:
   version "4.6.0"

@@ -1,199 +1,71 @@
 #!/usr/bin/env node
-const commandLineArgs = require ('command-line-args')
-const getUsage = require ('command-line-usage')
+const program = require('commander-plus')
 const chalk = require ('chalk')
 const prettyjson = require ('prettyjson')
-const yesno = require ('yesno')
+const package = require ('./package.json')
 
 const _find = require ('lodash.find')
 const _forEach = require ('lodash.foreach')
 
 const AWS = require('aws-sdk')
 
-// Create definitions for arguments
-const optionDefinitions = [
-    { name: 'help', alias: 'h', type: Boolean },
-    { name: 'taskdef', alias: 't', type: String },
-    { name: 'list', alias: 'l', type: Boolean },
-    { name: 'getEnvVars', alias: 'e', type: Boolean },
-    { name: 'var', alias: 'v', type: String },
-    { name: 'set', alias: 's', type: String },
-    { name: 'region', alias: 'r', type: String },
-    { name: 'quiet', alias: 'q', type: Boolean },
-    { name: 'yes', alias: 'y', type: Boolean },
-    { name: 'pretty', alias: 'p', type: Boolean },
-]
+AWS.config.update({ region: 'eu-west-1' })
 
-// Create definitions for help
-const usageSections = [
-  {
-    header: `JAWS: Jeff\'s AWS cli`,
-    content: `Try it!`
-  },
-  {
-    header: 'Options',
-    optionList: optionDefinitions
-  }
-]
+let ecs = new AWS.ECS()
 
-// Parse arguments
-const args = commandLineArgs (optionDefinitions)
-const usageText = getUsage (usageSections)
+program
+  .version (package.version)
+  // .option  ('-')
 
-// Show help if needed
-if (isEmptyObject (args) || args.help) {
-  
-  console.log (usageText)
-  process.exit (0)
+program
+  .command('*')
+  .action(function (env) {
+    errorLog(`Unknown command: ${env}`)
+  })
 
-}
+program
+  .command('env')
+  .option('-T, --taskdef [taskdef]')
+  .option('-v, --variable [variable]')
+  .option('-s, --set [value]')
+  .option('-p, --pretty', `Enable pretty rendering of JSON objects`)
+  .description('Environment actions')
+  .action(function(env) { envCommand(env) })
 
-if (args.region) AWS.config.update ( { region: args.region } )
+program.parse (process.argv)
 
-const ecs = new AWS.ECS()
 
 
+async function envCommand (env) {
 
+  if (!env.taskdef) return errorLog('No task definition supplied.')
 
-// Task definitions
-if (args.taskdef) taskdef (args)
+  const taskDefinition = (await describeTaskDefinition( { taskDefinition: env.taskdef } )).taskDefinition
 
+  if (!env.variable)
 
+    // No particular variable given
+    printObj ( taskDefinition.containerDefinitions[0].environment, env.pretty )
 
+  else {
 
+    // Variable actions
+    // TODO: SET
+    const envVar = _find (taskDefinition.containerDefinitions[0].environment, {name: env.variable})
 
+    if (envVar)
 
+      printObj ( { [env.variable]: envVar.value }, env.pretty )
 
+    else
 
-async function taskdef (args) {
-  const split  = args.taskdef.split (':')
-  const tdName = split[0]
-  const tdRev  = split[1]
-
-  // - List all taskdef revisions
-  if (args.list) {
-    debugLog ('Getting revision list of', args.taskdef)
-    return
-  }
-
-  // Pre-cache
-  let taskDefinition = ( await describeTaskDefinition( { taskDefinition: args.taskdef } ) ).taskDefinition
-
-  // - Get all environment variables
-  if (args.getEnvVars) {
-
-    if (taskDefinition.containerDefinitions && taskDefinition.containerDefinitions.length == 1) {
-
-      // Only one container definition, use that one
-      printObj (taskDefinition.containerDefinitions[0].environment)
-
-    } else if (taskDefinition.containerDefinitions && taskDefinition.containerDefinitions.length > 1) {
-
-      // More than one container definition, user must choose
-      if (args.containerDefinition && taskDefinition.containerDefinitions[Number(args.containerDefinition)] )
-
-        printObj (taskDefinition.containerDefinitions[Number(args.containerDefinition)].environment)
-
-      else
-
-        errorLog (`${ taskDefinition.containerDefinitions.length } containerDefinitions found. Choose one with --containerDefinition [index].`)
-
-    }
-
-    else {
-
-      errorLog (`${ taskDefinition.containerDefinitions.length } containerDefinitions found for ${ tdName }.`)
-
-    }
-
-
-  }
-
-  // - Get/mod a single variable
-  if (args.var) {
-
-    // -- Mod?
-    if (args.set) {
-
-      // Modify a var
-      if (taskDefinition.containerDefinitions && taskDefinition.containerDefinitions.length == 1) {
-
-        // Only one container definition, use that one
-        for (env of taskDefinition.containerDefinitions[0].environment) {
-
-          if (env.name === args.var) {
-
-            if (args.yes)
-
-              env.value = args.set
-
-            else {
-
-              if (await yesnoP (`${ chalk.bold.yellow ('WARNING:') } you are now changing an environment variable in task definition ${ chalk.bold( tdName ) }:\n${ chalk.bold.cyan (env.name) }: ${ chalk.bold.red (env.value) } -> ${ chalk.bold.green (args.set) }\nAre you sure you want to continue?`).catch( () => process.exit(1) ))
-
-                return env.value = args.set
-
-            }
-
-          }
-
-        }
-
-        printObj(taskDefinition)
-
-        return
-
-      } else if (taskDefinition.containerDefinitions && taskDefinition.containerDefinitions.length > 1) {
-
-        // More than one container definition, user must choose
-        if (args.containerDefinition && taskDefinition.containerDefinitions[Number(args.containerDefinition)] )
-
-          printObj (_find(taskDefinition.containerDefinitions[Number(args.containerDefinition)].environment, {'name': args.var}))
-
-        else
-
-          errorLog (`${ taskDefinition.containerDefinitions.length } containerDefinitions found. Choose one with --containerDefinition [index].`)
-
-      }
-
-      else {
-
-        errorLog (`${ taskDefinition.containerDefinitions.length } containerDefinitions found for ${ tdName }.`)
-
-      }
-
-    } else {
-
-      if (taskDefinition.containerDefinitions && taskDefinition.containerDefinitions.length == 1) {
-
-        // Only one container definition, use that one
-        printObj (_find(taskDefinition.containerDefinitions[0].environment, {'name': args.var}))
-
-      } else if (taskDefinition.containerDefinitions && taskDefinition.containerDefinitions.length > 1) {
-
-        // More than one container definition, user must choose
-        if (args.containerDefinition && taskDefinition.containerDefinitions[Number(args.containerDefinition)] )
-
-          printObj (_find(taskDefinition.containerDefinitions[Number(args.containerDefinition)].environment, {'name': args.var}))
-
-        else
-
-          errorLog (`${ taskDefinition.containerDefinitions.length } containerDefinitions found. Choose one with --containerDefinition [index].`)
-
-      }
-
-      else {
-
-        errorLog (`${ taskDefinition.containerDefinitions.length } containerDefinitions found for ${ tdName }.`)
-
-      }
-
-    }
-
+      errorLog ( `Variable not found: ${ env.variable }` )
 
   }
 
 }
+
+
 
 
 function describeTaskDefinition( args ) {
@@ -204,28 +76,21 @@ function describeTaskDefinition( args ) {
   })
 }
 
-function yesnoP (question) {
-  return new Promise (function (resolve, reject) {
-    yesno.ask(question, false, yes => yes ? resolve(yes) : reject())
-  })
-}
-
 function isEmptyObject (obj) {
   return !Object.keys(obj).length;
 }
 
-function printObj (obj) {
-  if (args.pretty) console.log (prettyjson.render (obj))
-  else  console.log (JSON.stringify (obj))
+function printObj (obj, pretty) {
+  if (pretty) console.log (prettyjson.render (obj))
+  else        console.log (JSON.stringify (obj))
 }
 
 function errorLog (err) {
-  console.log ('\n')
   if (err.code) console.log (chalk.red.bold('ERROR:'), err.code)
   if (err.message) console.log (err.message)
   else console.log (chalk.red.bold (err))
 }
 
 function debugLog() {
-  if (!args.quiet) console.log.apply(console.log, arguments)
+  /*if (!args.quiet) */console.log.apply(console.log, arguments)
 }
