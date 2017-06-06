@@ -13,9 +13,12 @@ AWS.config.update({ region: 'eu-west-1' })
 
 let ecs = new AWS.ECS()
 
+const silent = '-S, --silent Suppress any non-JSON output'
+
 program
   .version (package.version)
-  // .option  ('-')
+  .usage   ('<command> [options]')
+  .option  (silent)
 
 program
   .command('*')
@@ -25,20 +28,34 @@ program
 
 program
   .command('env')
-  .option('-T, --taskdef [taskdef]')
-  .option('-v, --variable [variable]')
-  .option('-s, --set [value]')
-  .option('-p, --pretty', `Enable pretty rendering of JSON objects`)
-  .description('Environment actions')
-  .action(function(env) { envCommand(env) })
+    .description('Environment actions')
+    .option('-T, --taskdef [taskdef] <required>')
+    .option('-v, --variable [variable]')
+    .option('-s, --set [value]')
+    .option('-p, --pretty', `Enable pretty rendering of JSON objects (not for use with pipe!)`)
+    .option(silent)
+    .action(function(env) { envCommand(env) })
 
-program.parse (process.argv)
+// Extend help
+program
+  .on ('--help', () => {
+    console.log('  Examples:')
+    console.log('')
+    console.log('    $ jaws env -T www-bleeve-nl')
+    console.log('    $ jaws env -T www-bleeve-nl -v BLEEVE_APIBASEURL')
+    console.log('')
+  })
 
+program
+  .parse (process.argv)
+
+// If no args given, display help and exit
+if (process.argv.length === 2) program.help()
 
 
 async function envCommand (env) {
 
-  if (!env.taskdef) return errorLog('No task definition supplied.')
+  if (!env.taskdef) errorLog('No task definition supplied.', true)
 
   const taskDefinition = (await describeTaskDefinition( { taskDefinition: env.taskdef } )).taskDefinition
 
@@ -85,10 +102,12 @@ function printObj (obj, pretty) {
   else        console.log (JSON.stringify (obj))
 }
 
-function errorLog (err) {
+function errorLog (err, exit) {
   if (err.code) console.log (chalk.red.bold('ERROR:'), err.code)
   if (err.message) console.log (err.message)
   else console.log (chalk.red.bold (err))
+  
+  if (exit) process.exit(-1)
 }
 
 function debugLog() {
