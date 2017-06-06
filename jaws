@@ -13,12 +13,13 @@ AWS.config.update({ region: 'eu-west-1' })
 
 let ecs = new AWS.ECS()
 
-const silent = '-S, --silent Suppress any non-JSON output'
+const silent = '-S, --silent'
+const silentDesc = 'Suppress any non-JSON output'
 
 program
   .version (package.version)
   .usage   ('<command> [options]')
-  .option  (silent)
+  .option  (silent, silentDesc)
 
 program
   .command('*')
@@ -33,7 +34,8 @@ program
     .option('-v, --variable [variable]')
     .option('-s, --set [value]')
     .option('-p, --pretty', `Enable pretty rendering of JSON objects (not for use with pipe!)`)
-    .option(silent)
+    .option('-y, --yes', `Don't confirm before updating AWS. Be careful!`)
+    .option(silent, silentDesc)
     .action(function(env) { envCommand(env) })
 
 // Extend help
@@ -41,7 +43,10 @@ program
   .on ('--help', () => {
     console.log('  Examples:')
     console.log('')
-    console.log('    $ jaws env -T www-bleeve-nl')
+    console.log(chalk.bold('    Show latest environment, pretty-printed'))
+    console.log('    $ jaws env -pT www-bleeve-nl')
+    console.log('')
+    console.log(chalk.bold('    Show latest specified environment variable'))
     console.log('    $ jaws env -T www-bleeve-nl -v BLEEVE_APIBASEURL')
     console.log('')
   })
@@ -58,25 +63,60 @@ async function envCommand (env) {
   if (!env.taskdef) errorLog('No task definition supplied.', true)
 
   const taskDefinition = (await describeTaskDefinition( { taskDefinition: env.taskdef } )).taskDefinition
+  const taskDefEnvVars = taskDefinition.containerDefinitions[0].environment
 
   if (!env.variable)
 
     // No particular variable given
-    printObj ( taskDefinition.containerDefinitions[0].environment, env.pretty )
+    printObj ( taskDefEnvVars, env.pretty )
 
   else {
 
     // Variable actions
     // TODO: SET
-    const envVar = _find (taskDefinition.containerDefinitions[0].environment, {name: env.variable})
 
-    if (envVar)
+    // GET enviroment and display
+    let envVar = _find (taskDefEnvVars, {name: env.variable})
 
-      printObj ( { [env.variable]: envVar.value }, env.pretty )
+    if (envVar) {
+      // GET variable
+      if(!env.set) {
 
-    else
+        printObj ( { [env.variable]: envVar.value }, env.pretty )
+
+      // GET var, change, confirm? and push
+      } else {
+
+        // Change the variable using the reference returned by _find
+        envVar.value = env.set
+
+        // Confirm please
+        if(!env.yes) {
+
+          // Show the user the new environment variables
+          printObj(taskDefEnvVars, env.pretty)
+
+          console.log(chalk.bold(`${chalk.red('\nWarning:')} will update ${env.taskdef} env vars to the above!`))
+
+          // Use .choose because of a bug with .confirm
+          program.choose(['Change environment variables', 'Leave everything intact'], i => {
+            if (i > 0) errorLog('Operation aborted by user', true)
+            else updateEnvironment( env.taskdef, taskDefEnvVars )
+          })
+
+        // We'll do it live!
+        } else {
+
+        }
+
+      }
+
+    // Variable not found
+    } else {
 
       errorLog ( `Variable not found: ${ env.variable }` )
+
+    }
 
   }
 
