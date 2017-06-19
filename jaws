@@ -99,13 +99,15 @@ async function envCommand (env) {
           console.log(chalk.bold(`${chalk.red('\nWarning:')} will update ${env.taskdef} env vars to the above!`))
 
           // Use .choose because of a bug with .confirm
-          program.choose(['Change environment variables', 'Leave everything intact'], i => {
+          program.choose(['CONFIRM: Change environment variables', 'CANCEL:  Leave everything intact'], i => {
             if (i > 0) errorLog('Operation aborted by user', true)
-            else updateEnvironment( env.taskdef, taskDefEnvVars )
+            else updateEnvironment( taskDefinition, env.silent )
           })
 
         // We'll do it live!
         } else {
+
+          updateEnvironment( taskDefinition, env.silent )
 
         }
 
@@ -116,6 +118,18 @@ async function envCommand (env) {
 
       errorLog ( `Variable not found: ${ env.variable }` )
 
+      if (env.set && !env.yes) {
+        program.choose([`ADD: Add this variable and set to ${env.set}`, `CANCEL: Do nothing.`], i => {
+          if (i > 0) errorLog('Operation aborted by user', true)
+          else {
+            taskDefEnvVars.push({ name: env.variable, value: env.set })
+            printObj(taskDefEnvVars, env.pretty)
+          }
+        })
+      } else if(env.set && env.yes) {
+        taskDefEnvVars.push({ name: env.variable, value: env.set })
+        printObj(taskDefEnvVars, env.pretty)
+      }
     }
 
   }
@@ -131,6 +145,23 @@ function describeTaskDefinition( args ) {
       return err ? reject (err) : resolve (data)
     })
   })
+}
+
+function updateEnvironment( taskDef, silent ) {
+
+  const params = {
+    containerDefinitions: taskDef.containerDefinitions,
+    family: taskDef.family,
+    volumes: taskDef.volumes
+  }
+
+  ecs.registerTaskDefinition( params, (err, data) => {
+    if (err) errorLog(err, true)
+    else if (!silent) console.log('OK')
+
+    process.exit(0)
+  } )
+
 }
 
 function isEmptyObject (obj) {
