@@ -10,9 +10,9 @@ Suppose you have a task definition `hello-app`, with a few environment variables
 
 ```json
 {
-  'NODE_ENV': 'development',
-  'version': '0.9',
-  'API_BASEURL': 'http://api.example.com'
+  "NODE_ENV": "development",
+  "version": "0.9",
+  "API_BASEURL": "http://api.example.com"
 }
 ```
 
