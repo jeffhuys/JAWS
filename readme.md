@@ -1,10 +1,10 @@
 # JAWS - Jeff's AWS Tool
 
-##### Why?
+#### Why?
 
 I find using AWS's CLI tool a bit unwieldy, when quickly checking some environment variable, or changing one inside a task definition on AWS ECS. This tool aims to change that.
 
-##### How?
+#### How?
 
 Suppose you have a task definition `hello-app`, with a few environment variables:
 
@@ -42,6 +42,6 @@ You can also view all the environment variables using this:
 
 
 
-##### Help?
+#### Help?
 
 If you need help, first check `jaws -h` and `jaws env -h` to view "detailed" help texts. If you need additional help, please create an issue.
